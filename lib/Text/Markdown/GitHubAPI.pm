@@ -12,26 +12,28 @@ use Encode qw/decode_utf8/;
 use Furl;
 use JSON;
 
+use Class::Accessor::Lite (
+    new => 1,
+    ro  => [qw/fallback_md_class error_msg/],
+);
+
 our @EXPORT_OK = qw/markdown/;
 
 our $API_URL = 'https://api.github.com/markdown';
 
-sub new {
-    my ($kls, %args) = @_;
-    bless {%args}, $kls;
+sub _error_msg {
+    shift->error_msg || '<p class="error">Request failed.</p>';
 }
 
-sub furl {
-    shift->{_furl} ||= Furl->new( timeout => 10 );
-}
-
-sub json {
-    shift->{_json} ||= JSON->new->utf8;
-}
-
+sub furl { shift->{_furl} ||= Furl->new( timeout => 10 ) }
+sub json { shift->{_json} ||= JSON->new->utf8 }
 sub fallback_md {
-    require 'Text::Markdown';
-    shift->{_fallbck_md} ||= Text::Markdown->new;
+    my $self = shift;
+    $self->{_fallbck_md} ||= do {
+        my $cls = $self->fallback_md_class || 'Text::Markdown';
+        require $cls;
+        $cls->new;
+    };
 }
 
 sub markdown {
@@ -65,7 +67,7 @@ sub markdown {
     }
     else {
         # fallback
-        '<p class="error">Request failed</p>' . $self->fallback_md->markdown($text);
+        $self->_error_msg . $self->fallback_md->markdown($text);
     }
 
 }
