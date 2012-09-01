@@ -22,16 +22,22 @@ sub new {
 }
 
 sub furl {
-    shift->{_furl} ||= Furl->new( timeout => 20 );
+    shift->{_furl} ||= Furl->new( timeout => 10 );
 }
 
 sub json {
     shift->{_json} ||= JSON->new->utf8;
 }
 
+sub fallback_md {
+    require 'Text::Markdown';
+    shift->{_fallbck_md} ||= Text::Markdown->new;
+}
+
 sub markdown {
     my ( $self, $text, $options ) = @_;
 
+    # copied from Text::Markdown
     # Detect functional mode, and create an instance for this run
     unless (ref $self) {
         if ( $self ne __PACKAGE__ ) {
@@ -55,7 +61,11 @@ sub markdown {
     ], $data);
 
     if ($res->is_success) {
-        return decode_utf8 $res->content;
+        decode_utf8 $res->content;
+    }
+    else {
+        # fallback
+        '<p class="error">Request failed</p>' . $self->fallback_md->markdown($text);
     }
 
 }
