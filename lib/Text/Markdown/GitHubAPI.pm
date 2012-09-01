@@ -8,10 +8,11 @@ use parent 'Exporter';
 our $VERSION = '0.01';
 $VERSION = eval $VERSION; ## no critic
 
-use Encode qw/decode_utf8/;
+use Encode qw/decode_utf8 encode_utf8/;
 use Furl;
 use JSON;
 
+use Cache::LRU;
 use Class::Accessor::Lite (
     new => 1,
     ro  => [qw/fallback_md_class error_msg/],
@@ -27,6 +28,8 @@ sub _error_msg {
 
 sub furl { shift->{_furl} ||= Furl->new( timeout => 10 ) }
 sub json { shift->{_json} ||= JSON->new->utf8 }
+sub cache { shift->{_cache} ||= Cache::LRU->new }
+
 sub fallback_md {
     my $self = shift;
     $self->{_fallbck_md} ||= do {
@@ -37,6 +40,7 @@ sub fallback_md {
         $cls->new;
     };
 }
+
 
 sub markdown {
     my ( $self, $text, $options ) = @_;
@@ -54,22 +58,28 @@ sub markdown {
         }
     }
 
-    # TODO: cache
-    my $data = $self->json->encode({
+    my $key = md5_hex(encode_utf8 $text);
+    my $html = $self->cache->get($key);
+
+    return $html if defined $html;
+
+    my $request_data = $self->json->encode({
         text => $text,
     });
 
     my $res = $self->furl->post($API_URL, [
         'Content-Type'   => 'application/json',
-        'Content-Length' => length($data),
-    ], $data);
+        'Content-Length' => length($request_data),
+    ], $request_data);
 
     if ($res->is_success) {
-        decode_utf8 $res->content;
+        my $html = decode_utf8 $res->content;
+        $self->cache->set($key => $html);
+        return $html;
     }
     else {
         # fallback
-        $self->_error_msg . $self->fallback_md->markdown($text);
+        return $self->_error_msg . $self->fallback_md->markdown($text);
     }
 
 }
