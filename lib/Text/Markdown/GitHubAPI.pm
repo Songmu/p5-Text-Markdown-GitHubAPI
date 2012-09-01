@@ -11,6 +11,7 @@ $VERSION = eval $VERSION; ## no critic
 use Encode qw/decode_utf8 encode_utf8/;
 use Furl;
 use JSON;
+use Class::Load qw/load_class/;
 
 use Cache::LRU;
 use Class::Accessor::Lite (
@@ -34,9 +35,7 @@ sub fallback_md {
     my $self = shift;
     $self->{_fallbck_md} ||= do {
         my $cls = $self->fallback_md_class || 'Text::Markdown';
-        my $file = $cls;
-        $file =~ s!::!/!g; $file .= '.pm';
-        require $file;
+        load_class $cls;
         $cls->new;
     };
 }
