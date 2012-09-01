@@ -31,7 +31,9 @@ sub fallback_md {
     my $self = shift;
     $self->{_fallbck_md} ||= do {
         my $cls = $self->fallback_md_class || 'Text::Markdown';
-        require $cls;
+        my $file = $cls;
+        $file =~ s!::!/!g; $file .= '.pm';
+        require $file;
         $cls->new;
     };
 }
